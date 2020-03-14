@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="EUC-JP"?>
+
+<extension name="phpdams" version="1.0.0">
+	<summary>PHP dams</summary>
+	
+	<deps language="cpp" platform="unix">
+		<with name="common">
+			<header name="iostream"/>
+			<header name="string"/>
+			<header name="vector"/>
+			<header name="stdexcept"/>
+                        <header name="zend_API.h"/>
+			<header name="zend_exceptions.h"/>
+		</with>
+		<with name="dams" defaults="../.." testfile="include/dams.h">
+			<header name="dams.h"/>
+			<lib name="dams" platform="unix"/>
+		</with>
+	</deps>
+	
+	<function name="dams_init">
+		<proto>void dams_init([string damsFileName])</proto>
+		<code>
+<![CDATA[
+	try {
+	        if (ZEND_NUM_ARGS() == 0) {
+		  damswrapper::init();
+                } else {
+		  damswrapper::init(damsFileName);
+		}
+	} catch (std::runtime_error& e) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C), (char*)e.what(), 0 TSRMLS_CC);
+		// zend_error(E_ERROR, e.what());
+	}
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_retrieve">
+		<proto>object dams_retrieve(string query)</proto>
+		<code>
+<![CDATA[
+	int score;
+	std::string tail;
+	std::vector<damswrapper::Candidate> candidates;
+	try {
+		damswrapper::retrieve(score, tail, candidates, query);
+	} catch (std::runtime_error& e) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C), (char*)e.what(), 0 TSRMLS_CC);
+		// zend_error(E_ERROR, e.what());
+	}
+	
+	object_init(return_value);
+	
+	// score
+	add_property_long(return_value, "score", score);
+	
+	// tail
+	char* tail_buf = (char*) malloc(sizeof(char) * (tail.size() + 1));
+	strcpy(tail_buf, tail.c_str());
+	add_property_string(return_value, "tail", tail_buf, 1);
+	free(tail_buf);
+	
+	// candidates
+	zval* cands_val;
+	MAKE_STD_ZVAL(cands_val);
+	array_init(cands_val);
+	for (std::vector<damswrapper::Candidate>::iterator it = candidates.begin(); it != candidates.end(); it++) {
+		zval* candi_val;
+		MAKE_STD_ZVAL(candi_val);
+		array_init(candi_val);
+		for (damswrapper::Candidate::iterator cit = it->begin(); cit != it->end(); cit++) {
+			zval* elem_val;
+			MAKE_STD_ZVAL(elem_val);
+			object_init(elem_val);
+			
+			char* name_buf = (char*) malloc(sizeof(char) * (cit->get_name().size() + 1));
+			strcpy(name_buf, cit->get_name().c_str());
+			add_property_string(elem_val, "name", name_buf, 1);
+			free(name_buf);
+			
+			add_property_long(elem_val, "level", cit->get_level());
+			add_property_double(elem_val, "x", cit->get_x());
+			add_property_double(elem_val, "y", cit->get_y());
+			
+			add_next_index_zval(candi_val, elem_val);
+		}
+		add_next_index_zval(cands_val, candi_val);
+	}
+	add_property_zval(return_value, "candidates", cands_val);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_debugmode">
+		<proto>void dams_debugmode(bool flag)</proto>
+		<code>
+<![CDATA[
+	damswrapper::debugmode(flag);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_set_check_new_address">
+		<proto>void dams_set_check_new_address(bool flag)</proto>
+		<code>
+<![CDATA[
+	damswrapper::set_check_new_address(flag);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_set_limit">
+		<proto>void dams_set_limit(int limit)</proto>
+		<code>
+<![CDATA[
+	damswrapper::set_limit(limit);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_set_exact_match_level">
+		<proto>void dams_set_exact_match_level(int level)</proto>
+		<code>
+<![CDATA[
+	damswrapper::set_exact_match_level(level);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_get_exact_match_level">
+		<proto>int dams_get_exact_match_level()</proto>
+		<code>
+<![CDATA[
+	int ret = damswrapper::get_exact_match_level();
+	RETURN_LONG(ret);
+]]>
+		</code>
+	</function>
+	
+	<function name="dams_elapsedtime">
+		<proto>int dams_elapsedtime()</proto>
+		<code>
+<![CDATA[
+	long ret = damswrapper::elapsedtime();
+	RETURN_LONG(ret);
+]]>
+		</code>
+	</function>
+	
+</extension>

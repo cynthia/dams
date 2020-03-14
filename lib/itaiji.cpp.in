@@ -1,0 +1,207 @@
+/* itaiji.c.in */
+/* read itaiji table and create itaiji hash */
+
+#include <map>
+#include "config.h"
+#include <stdio.h>
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif /* HAVE_STRING_H */
+#include "strlib.h"
+
+#ifndef BUFSIZ
+#define BUFSIZ 1024
+#endif /* BUFSIZ */
+
+static std::map<unsigned short int, unsigned short int> itaiji;
+
+static unsigned short int itaijival(int i) {
+  std::map<unsigned short int, unsigned short int>::iterator it;
+  if ((it = itaiji.find(i)) == itaiji.end()) return 0;
+  return it->second;
+}
+
+void init_itaiji(void) {
+  if (itaiji.size() > 0) return; // 既に初期化済み
+  std::pair<int, int> kv;
+
+  // 珱(65248)->瓔(64992)
+  // kv.first = 65248; kv.second = 64992; itaiji.insert(kv);
+%ITAIJI_TABLE%
+
+  return;
+}
+
+/* ２つの文字が異体字かどうかの判定 */
+int is_itaiji(const char* buf0, const char* buf1) {
+  unsigned short int val0, val1;
+  val0 = hexval(buf0);
+  if (itaijival(val0) > 0) {
+    val1 = hexval(buf1);
+    if (itaijival(val0) == itaijival(val1)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/* 見出し値を取得 */
+int get_itaijivalue(const char* string) {
+  return itaijival(hexval(string));
+}
+
+/* 標準形を取得 */
+/* 異体字の最左候補への変換 */
+/* 全角アラビア数字、漢数字を半角数字列に変換 */
+static const char* ruiji = "ケヶガがツッつっ";
+char standard_buf[BUFSIZ];
+char* standardize(const char* string) {
+  int flag = 0, ctype, prectype;
+  unsigned int tchar, itaiji_tchar, u;
+  char *cp;
+
+  prectype = 0; /* 直前の文字タイプ */
+  /* 先頭の字／小字／大字を省略 */
+  if (!strncmp(string, "字", 2) && strlen(string) > 2) { string += 2; }
+  else if (strlen(string) > 4 && (!strncmp(string, "大字", 4) || !strncmp(string, "小字", 4))) { string += 4; }
+  strcpy(standard_buf, string);
+  /* チェック */
+  for (cp = standard_buf; *cp;) {
+    ctype = _isKanji(cp);
+    switch (ctype) {
+    case 1: /* 漢字の場合 */
+    case 2: /* 半角かなの場合 */
+    case 4: /* 全角ひらがなの場合 */
+    case 5: /* 全角カタカナの場合 */
+      /* 省略可能文字の省略 */
+      if ((prectype == 1 || prectype == -1) && _isKanji(cp + 2) == 1 && (_isNumeric(cp + 2) < 0)) { /* ひらがな・カタカナ以外に挟まれる場合だけ省略される */
+	for (u = 0; u < strlen(ruiji); u += 2) {
+	  if (!strncmp(cp, ruiji + u, 2)) {
+	    memmove(cp, cp + 2, strlen(cp + 2) + 1);
+	    break;
+	  }
+	}
+	if (u < strlen(ruiji)) continue; /* 省略された */
+      }
+      /* 数字に挟まれた'ノ''の' の処理 */
+      if ((!strncmp(cp, "ノ", 2) || !strncmp(cp, "の", 2))) {
+	if (prectype == -1 && _isNumeric(cp + 2) >= 0) {
+	  *cp = '-';
+	  memmove(cp + 1, cp + 2, strlen(cp + 2) + 1);
+	  prectype = 0;
+	  cp++;
+	  break;
+	}
+      }
+      /* 異体字に置換 */
+      tchar = hexval(cp);
+      itaiji_tchar = itaijival(tchar);
+      if (itaiji_tchar != 0 && itaiji_tchar != tchar) {
+	flag = 1;
+	set_hexval(cp, itaiji_tchar);
+      }
+      /* 数字の場合は半角数字に置換 */
+      if (ctype == 1) {
+	static int bytes, val, col, v;
+	bytes = 0;
+	val = getNumber(cp, bytes);
+	if (bytes > 0) {
+	  /* 数字の場合 */
+	  /* 桁数のカウントと文字列への挿入 */
+	  if (val == 0) col = 1;
+	  else for (v = val, col = 0; v > 0; v /= 10) { col++; }
+	  memmove(cp + col + 1, cp + bytes, strlen(cp + bytes) + 1); /* 桁数と '.' 分空ける */
+	  bytes = col;
+	  if (val == 0) {
+	    *cp = '0';
+	  } else {
+	    for (v = val; v > 0; v /= 10) {
+	      *(cp + col - 1) = '0' + v % 10;
+	      col--;
+	    }
+	  }
+	  cp += bytes;
+	  *cp = '.';
+	  cp++;
+	  ctype = -1;
+	  break;
+	}
+      }
+      cp += 2; /* 数字以外の場合 */
+      break;
+    case 3: /* 補助漢字の場合 */
+      cp += 3;
+      break;
+    case 0: /* ASCII 文字の場合 */
+      static int bytes, val, col, v;
+      bytes = 0;
+      val = getNumber(cp, bytes);
+      if (bytes > 0) {
+	/* 数字の場合 */
+	/* 桁数のカウントと文字列への挿入 */
+	if (val == 0) col = 1;
+	else for (v = val, col = 0; v > 0; v /= 10) { col++; }
+	if (*(cp + col) == '.') {
+	  cp += col + 1;
+	} else {
+	  memmove(cp + col + 1, cp + bytes, strlen(cp + bytes) + 1); /* 桁数と '.' 分空ける */
+	  bytes = col;
+	  if (val == 0) {
+	    *cp = '0';
+	  } else {
+	    for (v = val; v > 0; v /= 10) {
+	      *(cp + col - 1) = '0' + v % 10;
+	      col--;
+	    }
+	  }
+	  cp += bytes;
+	  *cp = '.';
+	  cp++;
+	}
+	break;
+      } else {
+	cp++;
+      }
+      break;
+    case -1: /* EUC 以外のコード（コントロール文字を含む */
+      memmove(cp, cp + 1, strlen(cp + 1) + 1); /* 文字を省略 */
+      break;
+    }
+    prectype = ctype;
+  }
+  *cp = '\0';
+  /* 結果のチェック */
+#if 0
+  if (*standard_buf == '\0' && *string != '\0') { /* 全ての文字が消えてしまった */
+    fprintf(stderr, "'%s' -> NULL string.\n", string);
+    exit(1);
+  }
+#endif 
+  return standard_buf;
+}
+ 
+#ifdef ITAIJI_TEST
+int main(int argc, char** argv) {
+  int res, i;
+  char buf[BUFSIZ], *standard;
+  //res = init_itaiji("itaiji.txt");
+  init_itaiji();
+  fprintf(stderr, "住所文字列を入力してください。\n");
+
+  /* 標準入力から文字列を入力し、標準化して表示 */
+  while (fgets(buf, BUFSIZ - 1, stdin) != NULL) {
+    buf[strlen(buf) - 1] = '\0';
+    fprintf(stderr, "original string:\t'%s'\n", buf);
+    for (i = 0; i < 3; i++) {
+      standard = standardize(buf);
+      if (!strcmp(buf, standard)) {
+	fprintf(stderr, "(not changed) '%s'\n", standard);
+	break;
+      } else {
+	fprintf(stderr, "(standardized) '%s'\n", standard);
+	strcpy(buf, standard);
+      }
+    }
+  }
+}
+#endif /* ITAIJI_TEST */
