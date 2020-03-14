@@ -173,13 +173,12 @@ namespace damswrapper {
     fprintf(stderr, "nconverted('%s')\n", query);
 #endif
     matchlen = nconverted(euc_query.c_str(), result.rest.c_str()); // original
-    if (result.maxlen < 0 || matchlen < 0) {
+    if (result.maxlen < 0 || result.maxlen - abs(matchlen) < 0) {
       throw std::runtime_error("Unexpected return value detected from nconverted, match length is negative value when processing '" + q + "'");
     }
 #ifdef DEBUG
     fprintf(stderr, "maxlen = %d, query + maxlen = '%s'\n", result.maxlen, euc_query.c_str() + result.maxlen);
 #endif
-		
     // 結果のセット
     if (result.score == 0) {
       tail = q;
