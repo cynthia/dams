@@ -69,27 +69,12 @@ namespace damswrapper {
     }
   };
 
-  ///
-  /// @file
-  /// @brief damsの例外クラス。
-  ///
-
-  class DamsInitException : public std::runtime_error {
-  public:
-  DamsInitException(const char* msg) : runtime_error(msg) {}
-  };
-	
-  class DamsException : public std::runtime_error {
-  public:
-  DamsException(const char* msg) : runtime_error(msg) {}
-  };
-
   typedef std::vector<AddressElement> Candidate;
 	
   /// @brief 初期化します。
   /// @param [in] damsFileName 辞書ファイル名
   /// @exception ファイルが開けないなど、初期化に失敗した場合
-  void init(const std::string& damsFileName) throw (DamsInitException);
+  void init(const std::string& damsFileName);
 
   /// @brief デフォルトのジオコーダファイルが存在すれば開いて初期化します。
   void init(void);
@@ -116,7 +101,7 @@ namespace damswrapper {
 		int& score, 
 		std::string& tail, 
 		std::vector<Candidate>& candidates, 
-		const std::string& query) throw (DamsException);
+		const std::string& query);
 	
   /// @brief デバッグモードに設定します。初期化後の呼び出しのみ有効です。デフォルト値false
   /// @param [in] flag

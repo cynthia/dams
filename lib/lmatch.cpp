@@ -30,7 +30,7 @@ MatchNodeResult get_longestmatch(const char* keystring) {
   // 最長一致検索
   for (i = 0; i < keylen; i++) {
     char c = *(keystring + i);
-    if (!curTry->_nNext) {
+    if (!curTry || !curTry->_nNext) {
       // 文字列終端
       break;
     }

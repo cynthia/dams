@@ -58,7 +58,7 @@ namespace damswrapper {
   }
 	
   // 辞書ファイルを開く
-  void init(const std::string& damsFileName) throw (DamsInitException) {
+  void init(const std::string& damsFileName) {
     _init();
     std::string filepath = damsFileName;
     FILE* fp;
@@ -68,14 +68,14 @@ namespace damswrapper {
       fp = fopen((filepath + ".dat").c_str(), "r");
       if (!fp) {
 	std::string msg = "Can't open file: " + damsFileName;
-	throw DamsInitException(msg.c_str());
+	throw std::runtime_error(msg.c_str());
       }
     }
     fclose(fp);
 
     if (openfile(filepath.c_str())) {
       std::string msg = "Can't open file: " + filepath;
-      throw DamsInitException(msg.c_str());
+      throw std::runtime_error(msg.c_str());
     }
 
   }
@@ -127,7 +127,7 @@ namespace damswrapper {
 		int& score,
 		std::string& tail,
 		std::vector<Candidate>& candidates, 
-		const std::string& q) throw (DamsException) {
+		const std::string& q) {
     // 時間計測開始
     struct timeval tv_start;
     struct timeval tv_end;
@@ -150,7 +150,7 @@ namespace damswrapper {
 
     tmpvect.Clear();
     if (euc_query.length() > BUFSIZ - 1) {
-      throw DamsException("Query too long");
+      throw std::runtime_error("Query too long");
     }
 #ifdef DEBUG
     fprintf(stderr, "original   : '%s'\n", euc_query.c_str());
@@ -173,9 +173,8 @@ namespace damswrapper {
     fprintf(stderr, "nconverted('%s')\n", query);
 #endif
     matchlen = nconverted(euc_query.c_str(), result.rest.c_str()); // original
-    if (result.maxlen < 0) {
-      std::string msg = "Unexpected return value detected from nconverted, match length is negative value when processing '" + q + "'";
-      throw DamsException(msg.c_str());
+    if (result.maxlen < 0 || matchlen < 0) {
+      throw std::runtime_error("Unexpected return value detected from nconverted, match length is negative value when processing '" + q + "'");
     }
 #ifdef DEBUG
     fprintf(stderr, "maxlen = %d, query + maxlen = '%s'\n", result.maxlen, euc_query.c_str() + result.maxlen);
